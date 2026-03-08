@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Sora (Display) ── */
+@font-face {
+  font-family: "Sora";
+  src: url("/assets/fonts/Sora[wght].woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Outfit (Body) ── */
+@font-face {
+  font-family: "Outfit";
+  src: url("/assets/fonts/Outfit[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Geist Mono ── */
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* UniFind Design Tokens — Fresh Teal/Emerald Academic Theme */
+    --background: 0.98 0.006 180;
+    --foreground: 0.16 0.02 220;
+
+    --card: 1 0 0;
+    --card-foreground: 0.16 0.02 220;
+
+    --popover: 1 0 0;
+    --popover-foreground: 0.16 0.02 220;
+
+    /* Teal-emerald primary */
+    --primary: 0.52 0.16 172;
+    --primary-foreground: 1 0 0;
+
+    --secondary: 0.94 0.02 180;
+    --secondary-foreground: 0.3 0.06 180;
+
+    --muted: 0.95 0.008 200;
+    --muted-foreground: 0.5 0.03 210;
+
+    --accent: 0.9 0.04 172;
+    --accent-foreground: 0.3 0.1 172;
+
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 1 0 0;
+
+    --border: 0.88 0.015 190;
+    --input: 0.88 0.015 190;
+    --ring: 0.52 0.16 172;
+
+    /* Status colors */
+    --status-active: 0.55 0.18 162;
+    --status-pending: 0.72 0.18 65;
+    --status-resolved: 0.52 0.14 220;
+    --status-rejected: 0.577 0.245 27.325;
+
+    /* Chart */
+    --chart-1: 0.52 0.16 172;
+    --chart-2: 0.65 0.2 60;
+    --chart-3: 0.55 0.18 260;
+    --chart-4: 0.7 0.22 30;
+    --chart-5: 0.6 0.15 320;
+
+    /* Sidebar */
+    --sidebar: 0.16 0.02 220;
+    --sidebar-foreground: 0.94 0.01 200;
+    --sidebar-primary: 0.52 0.16 172;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.25 0.03 220;
+    --sidebar-accent-foreground: 0.9 0.01 200;
+    --sidebar-border: 0.25 0.025 220;
+    --sidebar-ring: 0.52 0.16 172;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Outfit", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Sora", sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Category color utilities */
+@layer utilities {
+  .cat-wallet { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }
+  .cat-phone { @apply bg-blue-50 text-blue-700 border-blue-200; }
+  .cat-idCard { @apply bg-orange-50 text-orange-700 border-orange-200; }
+  .cat-books { @apply bg-purple-50 text-purple-700 border-purple-200; }
+  .cat-keys { @apply bg-yellow-50 text-yellow-700 border-yellow-200; }
+  .cat-laptop { @apply bg-indigo-50 text-indigo-700 border-indigo-200; }
+  .cat-bag { @apply bg-teal-50 text-teal-700 border-teal-200; }
+  .cat-clothing { @apply bg-pink-50 text-pink-700 border-pink-200; }
+  .cat-jewelry { @apply bg-rose-50 text-rose-700 border-rose-200; }
+  .cat-earbuds { @apply bg-cyan-50 text-cyan-700 border-cyan-200; }
+  .cat-accessories { @apply bg-violet-50 text-violet-700 border-violet-200; }
+  .cat-other { @apply bg-gray-50 text-gray-700 border-gray-200; }
+
+  .status-active { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }
+  .status-pending { @apply bg-amber-50 text-amber-700 border-amber-200; }
+  .status-resolved { @apply bg-sky-50 text-sky-700 border-sky-200; }
+  .status-rejected { @apply bg-red-50 text-red-700 border-red-200; }
+  .status-archived { @apply bg-gray-50 text-gray-600 border-gray-200; }
+
+  .type-lost { @apply bg-red-50 text-red-700 border-red-200; }
+  .type-found { @apply bg-teal-50 text-teal-700 border-teal-200; }
+}
