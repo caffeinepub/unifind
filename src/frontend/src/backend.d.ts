@@ -30,6 +30,7 @@ export interface Item {
     itemType: Type__2;
     category: Type__1;
     location: string;
+    idCardPhotoId?: string;
     photoId?: string;
     archivedAt?: bigint;
 }
@@ -49,6 +50,7 @@ export interface ReportItemInput {
     itemType: Type__2;
     category: Type__1;
     location: string;
+    idCardPhotoId?: string;
     photoId?: string;
 }
 export interface Message {
@@ -110,6 +112,7 @@ export interface backendInterface {
     getArchivedItems(): Promise<Array<Item>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getIdCardPhotoId(itemId: string): Promise<string | null>;
     getItemById(itemId: string): Promise<Item | null>;
     getItems(filters: FilterItemsInput): Promise<Array<Item>>;
     getItemsByReporter(reporter: Principal): Promise<Array<Item>>;

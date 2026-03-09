@@ -1,26 +1,22 @@
 import Nat "mo:core/Nat";
 import Text "mo:core/Text";
 import Set "mo:core/Set";
-import Iter "mo:core/Iter";
-import List "mo:core/List";
 import Int "mo:core/Int";
-import Blob "mo:core/Blob";
-import Order "mo:core/Order";
+import List "mo:core/List";
 import Map "mo:core/Map";
 import Array "mo:core/Array";
 import Time "mo:core/Time";
-import Int32 "mo:core/Int32";
-import Option "mo:core/Option";
+import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
-import Char "mo:core/Char";
 
 import AccessControl "authorization/access-control";
 import Migration "migration";
-import MixinAuthorization "authorization/MixinAuthorization";
-import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
+import Storage "blob-storage/Storage";
+import MixinAuthorization "authorization/MixinAuthorization";
 
+// Add migration
 (with migration = Migration.run)
 actor {
   // Mixin components for access control and blob storage
@@ -32,7 +28,7 @@ actor {
   module ItemType {
     public type Type = { #lost; #found };
     public func compare(a : Type, b : Type) : Order.Order {
-      switch ((a, b)) {
+      switch (a, b) {
         case (#lost, #found) { #less };
         case (#found, #lost) { #greater };
         case (_) { #equal };
@@ -56,7 +52,7 @@ actor {
       #other;
     };
     public func compare(a : Type, b : Type) : Order.Order {
-      switch ((a, b)) {
+      switch (a, b) {
         case (#wallet, _) { #less };
         case (#phone, #wallet) { #greater };
         case (#phone, _) { #less };
@@ -87,7 +83,7 @@ actor {
   module ItemStatus {
     public type Type = { #pending; #active; #resolved; #rejected; #archived };
     public func compare(a : Type, b : Type) : Order.Order {
-      switch ((a, b)) {
+      switch (a, b) {
         case (#pending, #active or #resolved or #rejected or #archived) { #less };
         case (#active, #pending) { #greater };
         case (#active, #resolved or #rejected or #archived) { #less };
@@ -118,6 +114,7 @@ actor {
     claimedByQR : Bool;
     isSecurityPatrol : Bool;
     archivedAt : ?Int;
+    idCardPhotoId : ?Text; // NEW
   };
 
   public type Message = {
@@ -157,6 +154,7 @@ actor {
     date : Int;
     contactInfo : Text;
     photoId : ?Text;
+    idCardPhotoId : ?Text; // NEW
   };
 
   public type FilterItemsInput = {
@@ -260,63 +258,6 @@ actor {
     notifications.add(notificationId, notification);
   };
 
-  func luhnCheck(digits : [Nat]) : Bool {
-    var sum : Nat = 0;
-    let nDigits = digits.size();
-
-    for (i in Nat.range(0, nDigits)) {
-      let reversedIndex = nDigits - 1 - i;
-      if (reversedIndex >= 0 and reversedIndex < nDigits) {
-        var digit = digits[reversedIndex];
-        if (i % 2 == 1) {
-          digit *= 2;
-          if (digit > 9) { digit -= 9 };
-        };
-        sum += digit;
-      };
-    };
-
-    sum % 10 == 0;
-  };
-
-  func validateIdNumber(idCard : Text) : Bool {
-    idCard.size() == 13 and (
-      luhnCheck(
-        idCard.toArray().map(
-          func(char) {
-            switch (Nat.fromText(char.toText())) {
-              case (?number) { number };
-              case (null) { 0 };
-            };
-          }
-        )
-      )
-    );
-  };
-
-  func isBankCardNumber(cardNumber : Text) : Bool {
-    cardNumber.size() >= 14 and cardNumber.size() <= 19 and (
-      luhnCheck(
-        cardNumber.toArray().map(
-          func(char) {
-            switch (Nat.fromText(char.toText())) {
-              case (?number) { number };
-              case (null) { 0 };
-            };
-          }
-        )
-      )
-    );
-  };
-
-  func maskIdCard(idCard : Text) : Text {
-    idCard # "*********";
-  };
-
-  func maskCardNumber(cardNumber : Text) : Text {
-    cardNumber # "*********";
-  };
-
   public shared ({ caller }) func reportItem(input : ReportItemInput) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can report items");
@@ -324,29 +265,11 @@ actor {
 
     let itemId = generateId("item");
 
-    let description = switch (input.category) {
-      case (#idCard) {
-        if (validateIdNumber(input.description)) {
-          maskIdCard(input.description);
-        } else {
-          input.description;
-        };
-      };
-      case (#wallet) {
-        if (isBankCardNumber(input.description)) {
-          maskCardNumber(input.description);
-        } else {
-          input.description;
-        };
-      };
-      case (_) { input.description };
-    };
-
     let item : Item = {
       id = itemId;
       itemType = input.itemType;
       title = input.title;
-      description;
+      description = input.description;
       category = input.category;
       location = input.location;
       date = input.date;
@@ -359,6 +282,7 @@ actor {
       claimedByQR = false;
       isSecurityPatrol = securityPatrolUsers.contains(caller);
       archivedAt = null;
+      idCardPhotoId = input.idCardPhotoId; // Store the ID card photo
     };
 
     items.add(itemId, item);
@@ -417,6 +341,17 @@ actor {
 
   public query ({ caller }) func getItemById(itemId : Text) : async ?Item {
     items.get(itemId);
+  };
+
+  // New admin query to fetch idCardPhotoId
+  public query ({ caller }) func getIdCardPhotoId(itemId : Text) : async ?Text {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Admins only");
+    };
+    switch (items.get(itemId)) {
+      case (?item) { item.idCardPhotoId };
+      case (null) { Runtime.trap("Item not found") };
+    };
   };
 
   public shared ({ caller }) func updateItemStatus(itemId : Text, status : ItemStatus.Type) : async () {
@@ -575,7 +510,7 @@ actor {
   public query ({ caller }) func searchItems(searchTerm : Text, filters : FilterItemsInput) : async [Item] {
     let filteredItems = items.values().toArray().filter(
       func(item) {
-        let textMatch = item.title.contains(#text (searchTerm)) or item.description.contains(#text (searchTerm));
+        let textMatch = item.title.contains(#text searchTerm) or item.description.contains(#text searchTerm);
         let itemTypeMatch = switch (filters.itemType) {
           case (null) { true };
           case (?t) { t == item.itemType };
@@ -672,20 +607,12 @@ actor {
 
     // Determine who should receive the reward based on item type
     let rewardRecipient = switch (item.itemType) {
-      case (#lost) {
-        // For lost items, the owner (reporter) awards thanks to the finder
-        // The finder would be someone who reported a matching found item
-        // Since we don't track the specific finder, we cannot award in this simple model
-        // This needs to be called with context of who found it
-        Runtime.trap("Cannot determine finder for lost item");
-      };
+      case (#lost) { Runtime.trap("Cannot determine finder for lost item") };
       case (#found) {
-        // For found items, the owner (who lost it) awards thanks to the finder (reporter)
-        // The caller must be the owner (not the reporter)
         if (item.reportedBy == caller) {
           Runtime.trap("Cannot award thanks to yourself");
         };
-        item.reportedBy; // The finder is the reporter of the found item
+        item.reportedBy;
       };
     };
 
@@ -704,7 +631,6 @@ actor {
 
   public shared ({ caller }) func archiveExpiredItems() : async () {
     // Allow admins to manually trigger archiving
-    // Could also be called by anyone as a maintenance function
     if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can archive items");
     };

@@ -188,7 +188,7 @@ export default function FilterBar({
                 Location
               </Label>
               <Input
-                placeholder="e.g. Library, Canteen…"
+                placeholder="e.g. A1, B3, D5, FR…"
                 value={filters.location}
                 onChange={(e) => updateFilter("location", e.target.value)}
                 data-ocid={`${scope}.location_input`}

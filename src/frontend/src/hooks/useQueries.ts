@@ -387,6 +387,20 @@ export function useAssignUserRole() {
   });
 }
 
+// ── ID Card Verification ──────────────────────────────────────────────────
+
+export function useGetIdCardPhotoId(itemId: string | null) {
+  const { actor, isFetching } = useActor();
+  return useQuery<string | null>({
+    queryKey: ["idCardPhotoId", itemId],
+    queryFn: async () => {
+      if (!actor || !itemId) return null;
+      return actor.getIdCardPhotoId(itemId);
+    },
+    enabled: !!actor && !isFetching && !!itemId,
+  });
+}
+
 // ── Stats helpers ──────────────────────────────────────────────────────────
 
 export function useStats() {

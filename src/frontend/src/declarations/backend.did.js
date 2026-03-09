@@ -61,6 +61,7 @@ export const Item = IDL.Record({
   'itemType' : Type__2,
   'category' : Type__1,
   'location' : IDL.Text,
+  'idCardPhotoId' : IDL.Opt(IDL.Text),
   'photoId' : IDL.Opt(IDL.Text),
   'archivedAt' : IDL.Opt(IDL.Int),
 });
@@ -105,6 +106,7 @@ export const ReportItemInput = IDL.Record({
   'itemType' : Type__2,
   'category' : Type__1,
   'location' : IDL.Text,
+  'idCardPhotoId' : IDL.Opt(IDL.Text),
   'photoId' : IDL.Opt(IDL.Text),
 });
 
@@ -147,6 +149,7 @@ export const idlService = IDL.Service({
   'getArchivedItems' : IDL.Func([], [IDL.Vec(Item)], ['query']),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getIdCardPhotoId' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   'getItemById' : IDL.Func([IDL.Text], [IDL.Opt(Item)], ['query']),
   'getItems' : IDL.Func([FilterItemsInput], [IDL.Vec(Item)], ['query']),
   'getItemsByReporter' : IDL.Func([IDL.Principal], [IDL.Vec(Item)], ['query']),
@@ -230,6 +233,7 @@ export const idlFactory = ({ IDL }) => {
     'itemType' : Type__2,
     'category' : Type__1,
     'location' : IDL.Text,
+    'idCardPhotoId' : IDL.Opt(IDL.Text),
     'photoId' : IDL.Opt(IDL.Text),
     'archivedAt' : IDL.Opt(IDL.Int),
   });
@@ -274,6 +278,7 @@ export const idlFactory = ({ IDL }) => {
     'itemType' : Type__2,
     'category' : Type__1,
     'location' : IDL.Text,
+    'idCardPhotoId' : IDL.Opt(IDL.Text),
     'photoId' : IDL.Opt(IDL.Text),
   });
   
@@ -316,6 +321,7 @@ export const idlFactory = ({ IDL }) => {
     'getArchivedItems' : IDL.Func([], [IDL.Vec(Item)], ['query']),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getIdCardPhotoId' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
     'getItemById' : IDL.Func([IDL.Text], [IDL.Opt(Item)], ['query']),
     'getItems' : IDL.Func([FilterItemsInput], [IDL.Vec(Item)], ['query']),
     'getItemsByReporter' : IDL.Func(

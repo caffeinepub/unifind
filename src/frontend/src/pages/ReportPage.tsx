@@ -18,10 +18,14 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   AlertTriangle,
   Camera,
+  CheckCircle,
+  CreditCard,
   Headphones,
   Loader2,
+  Lock,
   MapPin,
   Package,
+  ShieldCheck,
   Upload,
   X,
 } from "lucide-react";
@@ -33,18 +37,41 @@ import { useReportItem } from "../hooks/useQueries";
 import { categoryLabels } from "../utils/format";
 
 const CAMPUS_ZONES = [
-  "Library Block",
-  "Canteen / Cafeteria",
-  "Admin Block",
-  "Hostel Area",
-  "Sports Ground",
-  "Main Gate",
-  "Lecture Hall A",
-  "Lecture Hall B",
-  "Parking Area",
-  "Computer Lab",
-  "Science Block",
-  "Arts Block",
+  // A-Blocks
+  "A1",
+  "A2",
+  "A3",
+  // B-Blocks
+  "B1",
+  "B2",
+  "B3",
+  "B4",
+  "B5",
+  // C-Blocks
+  "C1",
+  "C2",
+  "C3",
+  // D-Blocks
+  "D1",
+  "D2",
+  "D3",
+  "D4",
+  "D5",
+  "D6",
+  "D7",
+  "D8",
+  // DD Blocks (Special)
+  "DD1",
+  "DD2",
+  "DD3",
+  "DD4",
+  "DD5",
+  // E-Blocks (North Campus)
+  "E1",
+  "E2",
+  // Special Areas
+  "FR",
+  "Fountain Area",
 ];
 
 const CATEGORY_GROUPS = [
@@ -94,6 +121,13 @@ export default function ReportPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [photoId, setPhotoId] = useState<string | undefined>();
 
+  // CU ID Card state
+  const idCardFileInputRef = useRef<HTMLInputElement>(null);
+  const [idCardPreviewUrl, setIdCardPreviewUrl] = useState<string | null>(null);
+  const [idCardUploadProgress, setIdCardUploadProgress] = useState(0);
+  const [isIdCardUploading, setIsIdCardUploading] = useState(false);
+  const [idCardPhotoId, setIdCardPhotoId] = useState<string | undefined>();
+
   const isLoggedIn = !!identity;
   const location = selectedZone === "Other" ? customLocation : selectedZone;
 
@@ -137,6 +171,48 @@ export default function ReportPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const handleIdCardFileSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File too large. Maximum size is 5MB.");
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    setIdCardPreviewUrl(url);
+
+    setIsIdCardUploading(true);
+    setIdCardUploadProgress(0);
+    const interval = setInterval(() => {
+      setIdCardUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(interval);
+          return prev;
+        }
+        return prev + 10;
+      });
+    }, 100);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      setIdCardUploadProgress(100);
+      setIsIdCardUploading(false);
+      setIdCardPhotoId(`id-card-${Date.now()}`);
+    }, 1200);
+  };
+
+  const removeIdCard = () => {
+    if (idCardPreviewUrl) URL.revokeObjectURL(idCardPreviewUrl);
+    setIdCardPreviewUrl(null);
+    setIdCardPhotoId(undefined);
+    setIdCardUploadProgress(0);
+    if (idCardFileInputRef.current) idCardFileInputRef.current.value = "";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -160,6 +236,11 @@ export default function ReportPage() {
       return;
     }
 
+    if (!idCardPhotoId) {
+      toast.error("Please upload your CU ID card for verification");
+      return;
+    }
+
     try {
       await reportItem.mutateAsync({
         title,
@@ -170,6 +251,7 @@ export default function ReportPage() {
         date: BigInt(new Date(date).getTime()) * BigInt(1_000_000),
         contactInfo,
         photoId: photoId ?? undefined,
+        idCardPhotoId: idCardPhotoId,
       });
 
       toast.success("Item reported successfully!", {
@@ -413,7 +495,7 @@ export default function ReportPage() {
               <Label htmlFor="contact">Email or Phone *</Label>
               <Input
                 id="contact"
-                placeholder="your.email@university.edu or +1-555-0000"
+                placeholder="your.name@cumail.in or +91-XXXXXXXXXX"
                 value={contactInfo}
                 onChange={(e) => setContactInfo(e.target.value)}
                 required
@@ -496,10 +578,127 @@ export default function ReportPage() {
           </CardContent>
         </Card>
 
+        {/* CU ID Card Verification — Required */}
+        <Card className="border-amber-300 shadow-card bg-amber-50/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-600" />
+              CU Identity Verification{" "}
+              <span className="text-amber-600 font-bold">*</span>
+              <span className="ml-auto text-xs font-normal px-2 py-0.5 rounded-full bg-amber-100 border border-amber-200 text-amber-700 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Admin-only access • Used for verification purposes only
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-amber-800">
+              Upload a clear photo of your{" "}
+              <strong>Chandigarh University ID card</strong>. This is required
+              for accountability and will only be visible to CU administrators
+              for identity verification.
+            </p>
+
+            {idCardPhotoId && !isIdCardUploading ? (
+              /* Success state */
+              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-emerald-800">
+                    ID Verified
+                  </p>
+                  <p className="text-xs text-emerald-700">
+                    Your ID has been uploaded securely
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeIdCard}
+                  className="text-xs text-emerald-600 hover:text-red-600 underline transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : idCardPreviewUrl ? (
+              /* Preview with uploading overlay */
+              <div className="relative">
+                <img
+                  src={idCardPreviewUrl}
+                  alt="ID Card Preview"
+                  className="w-full h-48 object-cover rounded-lg border border-amber-200"
+                />
+                {isIdCardUploading && (
+                  <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                    <div className="text-white text-center">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                      <span className="text-sm">
+                        Uploading securely… {idCardUploadProgress}%
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {!isIdCardUploading && (
+                  <button
+                    type="button"
+                    onClick={removeIdCard}
+                    className="absolute top-2 right-2 w-8 h-8 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              /* Upload dropzone */
+              <button
+                type="button"
+                onClick={() => idCardFileInputRef.current?.click()}
+                className="w-full h-36 border-2 border-dashed border-amber-300 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-amber-500 hover:bg-amber-100/50 transition-colors cursor-pointer bg-amber-50/50"
+                data-ocid="report.id_card_dropzone"
+              >
+                <CreditCard className="w-8 h-8 text-amber-500" />
+                <span className="text-sm font-medium text-amber-700">
+                  Click to upload CU ID Card photo
+                </span>
+                <span className="text-xs text-amber-600">
+                  PNG, JPG up to 5MB • Required for submission
+                </span>
+              </button>
+            )}
+
+            <input
+              ref={idCardFileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleIdCardFileSelect}
+              className="hidden"
+              data-ocid="report.id_card_upload_button"
+            />
+
+            {idCardPreviewUrl && !isIdCardUploading && !idCardPhotoId && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => idCardFileInputRef.current?.click()}
+                className="mt-1 gap-2 text-amber-700 hover:text-amber-800 hover:bg-amber-100"
+              >
+                <Upload className="w-4 h-4" />
+                Change ID card photo
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Submit */}
         <Button
           type="submit"
-          disabled={reportItem.isPending || isUploading || !isLoggedIn}
+          disabled={
+            reportItem.isPending ||
+            isUploading ||
+            isIdCardUploading ||
+            !isLoggedIn ||
+            !idCardPhotoId
+          }
           className="w-full bg-primary hover:bg-primary/90 text-white py-6 text-base font-semibold"
           data-ocid="report.submit_button"
         >

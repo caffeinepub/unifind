@@ -1,9 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 
-const SKELETON_KEYS = ["sk1", "sk2", "sk3", "sk4"];
 import {
   AlertTriangle,
   ArrowRight,
@@ -14,100 +12,22 @@ import {
   Search,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { Type__2 } from "../backend.d";
-import ItemCard from "../components/ItemCard";
-import { useGetItems, useStats } from "../hooks/useQueries";
-
-const sampleItems = [
-  {
-    id: "sample-1",
-    title: "Black Samsung Galaxy S23",
-    description:
-      "Lost near the Engineering building. Has a cracked screen protector and University sticker on the back.",
-    category: "phone" as never,
-    itemType: "lost" as never,
-    location: "Engineering Block B",
-    status: "active" as never,
-    date: BigInt(Date.now() - 2 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
-    createdAt: BigInt(Date.now() - 2 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
-    contactInfo: "john@university.edu",
-    reportedBy: "abc" as never,
-    photoId: undefined,
-  },
-  {
-    id: "sample-2",
-    title: "Found: Blue North Face Backpack",
-    description:
-      "Found near the library entrance. Contains some textbooks and a laptop charger.",
-    category: "bag" as never,
-    itemType: "found" as never,
-    location: "Central Library",
-    status: "active" as never,
-    date: BigInt(Date.now() - 1 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
-    createdAt: BigInt(Date.now() - 1 * 24 * 60 * 60 * 1000) * BigInt(1_000_000),
-    contactInfo: "sarah@university.edu",
-    reportedBy: "def" as never,
-    photoId: undefined,
-  },
-  {
-    id: "sample-3",
-    title: "Student ID Card - Rahul Sharma",
-    description:
-      "Found an ID card near the cafeteria. Please contact if you know the owner.",
-    category: "idCard" as never,
-    itemType: "found" as never,
-    location: "Main Cafeteria",
-    status: "active" as never,
-    date: BigInt(Date.now() - 3 * 60 * 60 * 1000) * BigInt(1_000_000),
-    createdAt: BigInt(Date.now() - 3 * 60 * 60 * 1000) * BigInt(1_000_000),
-    contactInfo: "security@university.edu",
-    reportedBy: "ghi" as never,
-    photoId: undefined,
-  },
-  {
-    id: "sample-4",
-    title: 'MacBook Pro 14" (Silver)',
-    description:
-      "Lost during evening lecture. Has stickers of various programming languages. Last seen in Room 204.",
-    category: "laptop" as never,
-    itemType: "lost" as never,
-    location: "Science Building, Room 204",
-    status: "pending" as never,
-    date: BigInt(Date.now() - 5 * 60 * 60 * 1000) * BigInt(1_000_000),
-    createdAt: BigInt(Date.now() - 5 * 60 * 60 * 1000) * BigInt(1_000_000),
-    contactInfo: "mia@university.edu",
-    reportedBy: "jkl" as never,
-    photoId: undefined,
-  },
-];
+import { useStats } from "../hooks/useQueries";
 
 export default function HomePage() {
-  const { data: recentLost = [], isLoading: loadingLost } = useGetItems({
-    itemType: Type__2.lost,
-  });
-  const { data: recentFound = [], isLoading: loadingFound } = useGetItems({
-    itemType: Type__2.found,
-  });
   const { data: stats } = useStats();
-
-  const recentItems = [...recentLost, ...recentFound]
-    .sort((a, b) => Number(b.createdAt - a.createdAt))
-    .slice(0, 4);
-
-  const displayItems = recentItems.length > 0 ? recentItems : sampleItems;
-  const isLoading = loadingLost || loadingFound;
 
   const statCards = [
     {
       label: "Items Reported Lost",
-      value: stats?.lost ?? recentLost.length,
+      value: stats?.lost ?? 0,
       icon: AlertTriangle,
       color: "text-red-500",
       bg: "bg-red-50",
     },
     {
       label: "Items Found",
-      value: stats?.found ?? recentFound.length,
+      value: stats?.found ?? 0,
       icon: Package,
       color: "text-teal-600",
       bg: "bg-teal-50",
@@ -143,7 +63,7 @@ export default function HomePage() {
                   <BookOpen className="w-4 h-4 text-white" />
                 </div>
                 <span className="text-white/70 text-sm font-medium tracking-wide uppercase">
-                  University Lost & Found
+                  Chandigarh University – Lost & Found
                 </span>
               </div>
 
@@ -154,8 +74,9 @@ export default function HomePage() {
               </h1>
 
               <p className="text-white/70 text-lg md:text-xl mb-8 max-w-2xl leading-relaxed">
-                Lost something on campus? Found an item? Report it here and help
-                your fellow students get their belongings back.
+                Lost something on the CU campus? Found an item? Report it here
+                and help your fellow Chandigarh University students get their
+                belongings back.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
@@ -311,52 +232,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Recent Items */}
-      <section className="container mx-auto px-4 mt-10 md:mt-14">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="font-display text-2xl font-bold text-foreground">
-              Recent Items
-            </h2>
-            <p className="text-muted-foreground text-sm mt-1">
-              Latest lost and found reports on campus
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link to="/lost">
-              <Button variant="ghost" size="sm" className="text-primary gap-1">
-                View all <ArrowRight className="w-3 h-3" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {SKELETON_KEYS.map((k) => (
-              <div
-                key={k}
-                className="rounded-xl overflow-hidden border border-border bg-white shadow-card"
-              >
-                <Skeleton className="h-40 w-full" />
-                <div className="p-4 space-y-3">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-3 w-3/4" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {displayItems.slice(0, 4).map((item, i) => (
-              <ItemCard key={item.id} item={item} index={i + 1} />
-            ))}
-          </div>
-        )}
-      </section>
-
       {/* How it Works */}
       <section className="container mx-auto px-4 mt-12 md:mt-16">
         <div className="text-center mb-8">
@@ -364,7 +239,8 @@ export default function HomePage() {
             How UniFind Works
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Simple steps to report or find your belongings on campus
+            Simple steps to report or find your belongings on Chandigarh
+            University campus
           </p>
         </div>
 

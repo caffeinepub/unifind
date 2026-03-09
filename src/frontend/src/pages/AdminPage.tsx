@@ -13,6 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -40,15 +46,18 @@ import {
   CheckCircle,
   ChevronDown,
   Clock,
+  CreditCard,
+  Eye,
   Loader2,
   Package,
   QrCode,
   Shield,
+  ShieldCheck,
   Trash2,
   User,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Type } from "../backend.d";
 import type { Item } from "../backend.d";
@@ -60,6 +69,7 @@ import {
   useGenerateQRCode,
   useGetAllItems,
   useGetArchivedItems,
+  useGetIdCardPhotoId,
   useGetPendingItems,
   useIsCallerAdmin,
   useUpdateItemStatus,
@@ -116,13 +126,23 @@ function ItemRow({
   return (
     <TableRow data-ocid={`admin.item.${index}`} className="hover:bg-muted/30">
       <TableCell>
-        <Link
-          to="/item/$id"
-          params={{ id: item.id }}
-          className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1 max-w-xs"
-        >
-          {item.title}
-        </Link>
+        <div className="flex items-center gap-1.5">
+          <Link
+            to="/item/$id"
+            params={{ id: item.id }}
+            className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1 max-w-xs"
+          >
+            {item.title}
+          </Link>
+          {item.idCardPhotoId && (
+            <span
+              title="ID card uploaded"
+              className="inline-flex items-center px-1 py-0.5 rounded text-xs bg-amber-100 text-amber-600 border border-amber-200 shrink-0"
+            >
+              <ShieldCheck className="w-3 h-3" />
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mt-0.5">
           {categoryLabels[item.category] ?? item.category}
         </p>
@@ -359,6 +379,275 @@ function QRCodesTab({ items }: { items: Item[] }) {
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+function IdCardModal({
+  item,
+  open,
+  onClose,
+}: {
+  item: Item;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { data: idCardPhotoId, isLoading } = useGetIdCardPhotoId(
+    open ? item.id : null,
+  );
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const prevBlobUrl = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (prevBlobUrl.current) {
+      URL.revokeObjectURL(prevBlobUrl.current);
+      prevBlobUrl.current = null;
+    }
+    setBlobUrl(null);
+
+    if (!idCardPhotoId) return;
+    // Use the same pattern as item photo display
+    const photoUrl = `/api/photo/${idCardPhotoId}`;
+    setBlobUrl(photoUrl);
+  }, [idCardPhotoId]);
+
+  useEffect(() => {
+    return () => {
+      if (prevBlobUrl.current) {
+        URL.revokeObjectURL(prevBlobUrl.current);
+      }
+    };
+  }, []);
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg" data-ocid="admin.id_card_modal">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-amber-600" />
+            CU ID Card – {item.title}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Privacy notice */}
+          <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800">
+              <strong>Confidential:</strong> This image is confidential. Use
+              only for identity verification purposes. Unauthorized access or
+              sharing is strictly prohibited.
+            </p>
+          </div>
+
+          {/* ID Card Image */}
+          <div className="rounded-xl overflow-hidden border border-border bg-muted min-h-48 flex items-center justify-center">
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-2 py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Loading ID card…
+                </p>
+              </div>
+            ) : blobUrl ? (
+              <img
+                src={blobUrl}
+                alt="CU ID Card"
+                className="w-full object-contain max-h-80"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                <CreditCard className="w-10 h-10" />
+                <p className="text-sm">No ID card uploaded for this item</p>
+              </div>
+            )}
+          </div>
+
+          {/* Item info */}
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-muted-foreground mb-0.5">Reporter</p>
+              <p className="font-mono font-medium truncate">
+                {item.reportedBy.toString().slice(0, 20)}…
+              </p>
+            </div>
+            <div className="p-2 bg-muted rounded-lg">
+              <p className="text-muted-foreground mb-0.5">Item Type</p>
+              <p
+                className={cn(
+                  "font-semibold capitalize",
+                  item.itemType === "lost" ? "text-red-600" : "text-teal-600",
+                )}
+              >
+                {item.itemType}
+              </p>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function IdVerificationTab({ items }: { items: Item[] }) {
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const openModal = (item: Item) => {
+    setSelectedItem(item);
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+  };
+
+  const itemsWithId = items.filter((i) => i.idCardPhotoId);
+  const itemsWithoutId = items.filter((i) => !i.idCardPhotoId);
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-semibold text-amber-800 mb-1">
+              ID Verification Panel
+            </h3>
+            <p className="text-xs text-amber-700">
+              View submitted CU ID card photos for identity verification. ID
+              cards are only accessible to authorized administrators and used
+              strictly for verification during the claim process.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200 text-center">
+          <div className="text-2xl font-bold text-emerald-700">
+            {itemsWithId.length}
+          </div>
+          <div className="text-xs text-emerald-600">ID Uploaded</div>
+        </div>
+        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 text-center">
+          <div className="text-2xl font-bold text-gray-600">
+            {itemsWithoutId.length}
+          </div>
+          <div className="text-xs text-gray-500">No ID Submitted</div>
+        </div>
+      </div>
+
+      {/* Items Table */}
+      {items.length === 0 ? (
+        <div
+          className="text-center py-16"
+          data-ocid="admin.id_verification_empty_state"
+        >
+          <ShieldCheck className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+          <h3 className="font-semibold text-foreground mb-1">No items yet</h3>
+          <p className="text-muted-foreground text-sm">
+            Submitted reports with ID verification will appear here.
+          </p>
+        </div>
+      ) : (
+        <div
+          className="bg-white rounded-xl border border-border overflow-hidden shadow-card"
+          data-ocid="admin.id_verification_table"
+        >
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30">
+                <TableHead>Item</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Reporter</TableHead>
+                <TableHead>ID Status</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((item, index) => (
+                <TableRow
+                  key={item.id}
+                  className="hover:bg-muted/30"
+                  data-ocid={`admin.id_verification.row.${index + 1}`}
+                >
+                  <TableCell>
+                    <Link
+                      to="/item/$id"
+                      params={{ id: item.id }}
+                      className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1 max-w-xs"
+                      data-ocid="admin.id_verification.link"
+                    >
+                      {item.title}
+                    </Link>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {categoryLabels[item.category] ?? item.category}
+                    </p>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={cn(
+                        "px-2 py-0.5 text-xs font-semibold rounded-full border capitalize",
+                        item.itemType === "lost" ? "type-lost" : "type-found",
+                      )}
+                    >
+                      {item.itemType}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground font-mono max-w-28 truncate">
+                    {item.reportedBy.toString().slice(0, 16)}…
+                  </TableCell>
+                  <TableCell>
+                    {item.idCardPhotoId ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle className="w-3 h-3" />
+                        ID Uploaded
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 text-gray-500 border border-gray-200">
+                        No ID
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openModal(item)}
+                      disabled={!item.idCardPhotoId}
+                      className={cn(
+                        "text-xs h-7 gap-1",
+                        item.idCardPhotoId
+                          ? "border-amber-200 text-amber-700 hover:bg-amber-50"
+                          : "opacity-40 cursor-not-allowed",
+                      )}
+                      data-ocid={`admin.view_id_card_button.${index + 1}`}
+                    >
+                      <Eye className="w-3 h-3" />
+                      View ID Card
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Modal */}
+      {selectedItem && (
+        <IdCardModal
+          item={selectedItem}
+          open={modalOpen}
+          onClose={closeModal}
+        />
+      )}
     </div>
   );
 }
@@ -614,6 +903,14 @@ export default function AdminPage() {
             QR Codes
           </TabsTrigger>
           <TabsTrigger
+            value="idverification"
+            className="gap-2"
+            data-ocid="admin.id_verification_tab"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            ID Verification
+          </TabsTrigger>
+          <TabsTrigger
             value="security"
             className="gap-2"
             data-ocid="admin.security_tab"
@@ -804,6 +1101,19 @@ export default function AdminPage() {
             </div>
           ) : (
             <QRCodesTab items={allItems} />
+          )}
+        </TabsContent>
+
+        {/* ID Verification Tab */}
+        <TabsContent value="idverification">
+          {loadingAll ? (
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
+          ) : (
+            <IdVerificationTab items={allItems} />
           )}
         </TabsContent>
 

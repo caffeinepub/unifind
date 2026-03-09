@@ -116,6 +116,7 @@ export interface Item {
     itemType: Type__2;
     category: Type__1;
     location: string;
+    idCardPhotoId?: string;
     photoId?: string;
     archivedAt?: bigint;
 }
@@ -138,6 +139,7 @@ export interface ReportItemInput {
     itemType: Type__2;
     category: Type__1;
     location: string;
+    idCardPhotoId?: string;
     photoId?: string;
 }
 export interface _CaffeineStorageCreateCertificateResult {
@@ -210,6 +212,7 @@ export interface backendInterface {
     getArchivedItems(): Promise<Array<Item>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getIdCardPhotoId(itemId: string): Promise<string | null>;
     getItemById(itemId: string): Promise<Item | null>;
     getItems(filters: FilterItemsInput): Promise<Array<Item>>;
     getItemsByReporter(reporter: Principal): Promise<Array<Item>>;
@@ -481,6 +484,20 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.getCallerUserRole();
             return from_candid_UserRole_n22(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getIdCardPhotoId(arg0: string): Promise<string | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getIdCardPhotoId(arg0);
+                return from_candid_opt_n15(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getIdCardPhotoId(arg0);
+            return from_candid_opt_n15(this._uploadFile, this._downloadFile, result);
         }
     }
     async getItemById(arg0: string): Promise<Item | null> {
@@ -773,6 +790,7 @@ function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uin
     itemType: _Type__2;
     category: _Type__1;
     location: string;
+    idCardPhotoId: [] | [string];
     photoId: [] | [string];
     archivedAt: [] | [bigint];
 }): {
@@ -790,6 +808,7 @@ function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uin
     itemType: Type__2;
     category: Type__1;
     location: string;
+    idCardPhotoId?: string;
     photoId?: string;
     archivedAt?: bigint;
 } {
@@ -808,6 +827,7 @@ function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uin
         itemType: from_candid_Type__2_n16(_uploadFile, _downloadFile, value.itemType),
         category: from_candid_Type__1_n18(_uploadFile, _downloadFile, value.category),
         location: value.location,
+        idCardPhotoId: record_opt_to_undefined(from_candid_opt_n15(_uploadFile, _downloadFile, value.idCardPhotoId)),
         photoId: record_opt_to_undefined(from_candid_opt_n15(_uploadFile, _downloadFile, value.photoId)),
         archivedAt: record_opt_to_undefined(from_candid_opt_n20(_uploadFile, _downloadFile, value.archivedAt))
     };
@@ -948,6 +968,7 @@ function to_candid_record_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     itemType: Type__2;
     category: Type__1;
     location: string;
+    idCardPhotoId?: string;
     photoId?: string;
 }): {
     title: string;
@@ -957,6 +978,7 @@ function to_candid_record_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     itemType: _Type__2;
     category: _Type__1;
     location: string;
+    idCardPhotoId: [] | [string];
     photoId: [] | [string];
 } {
     return {
@@ -967,6 +989,7 @@ function to_candid_record_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         itemType: to_candid_Type__2_n29(_uploadFile, _downloadFile, value.itemType),
         category: to_candid_Type__1_n31(_uploadFile, _downloadFile, value.category),
         location: value.location,
+        idCardPhotoId: value.idCardPhotoId ? candid_some(value.idCardPhotoId) : candid_none(),
         photoId: value.photoId ? candid_some(value.photoId) : candid_none()
     };
 }

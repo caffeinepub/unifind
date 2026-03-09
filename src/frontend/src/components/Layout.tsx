@@ -78,6 +78,9 @@ export default function Layout() {
             <span>
               Uni<span className="text-primary">Find</span>
             </span>
+            <span className="hidden lg:block text-xs text-muted-foreground font-normal border border-border rounded px-1.5 py-0.5 ml-1">
+              CU Campus
+            </span>
           </Link>
 
           {/* Desktop Nav */}
@@ -367,7 +370,8 @@ export default function Layout() {
             &amp; <span className="font-medium text-foreground">Deepanshu</span>
           </p>
           <p>
-            © {new Date().getFullYear()} UniFind. Built with ❤️ using{" "}
+            © {new Date().getFullYear()} UniFind – Chandigarh University. Built
+            with ❤️ using{" "}
             <a
               href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname)}`}
               target="_blank"

@@ -1,70 +1,43 @@
 import Map "mo:core/Map";
 import Set "mo:core/Set";
-import Text "mo:core/Text";
-import Option "mo:core/Option";
 import Principal "mo:core/Principal";
 
-import AccessControl "authorization/access-control";
-
 module {
-  type OldItemType = { #lost; #found };
-  type OldCategory = {
-    #wallet;
-    #phone;
-    #idCard;
-    #books;
-    #keys;
-    #laptop;
-    #bag;
-    #clothing;
-    #jewelry;
-    #other;
+  // Original types (pre-migration)
+  module ItemType {
+    public type Type = { #lost; #found };
   };
-  type OldItemStatus = { #pending; #active; #resolved; #rejected };
-
-  type NewCategory = {
-    #wallet;
-    #phone;
-    #earbuds;
-    #idCard;
-    #books;
-    #keys;
-    #laptop;
-    #bag;
-    #clothing;
-    #jewelry;
-    #accessories;
-    #other;
+  module Category {
+    public type Type = {
+      #wallet;
+      #phone;
+      #earbuds;
+      #idCard;
+      #books;
+      #keys;
+      #laptop;
+      #bag;
+      #clothing;
+      #jewelry;
+      #accessories;
+      #other;
+    };
   };
-
-  type NewItemStatus = { #pending; #active; #resolved; #rejected; #archived };
+  module ItemStatus {
+    public type Type = { #pending; #active; #resolved; #rejected; #archived };
+  };
 
   type OldItem = {
     id : Text;
-    itemType : OldItemType;
+    itemType : ItemType.Type;
     title : Text;
     description : Text;
-    category : OldCategory;
+    category : Category.Type;
     location : Text;
     date : Int;
     contactInfo : Text;
     photoId : ?Text;
-    status : OldItemStatus;
-    reportedBy : Principal;
-    createdAt : Int;
-  };
-
-  type NewItem = {
-    id : Text;
-    itemType : OldItemType;
-    title : Text;
-    description : Text;
-    category : NewCategory;
-    location : Text;
-    date : Int;
-    contactInfo : Text;
-    photoId : ?Text;
-    status : NewItemStatus;
+    status : ItemStatus.Type;
     reportedBy : Principal;
     createdAt : Int;
     qrClaimCode : ?Text;
@@ -75,90 +48,92 @@ module {
 
   type OldActor = {
     items : Map.Map<Text, OldItem>;
-    userProfiles : Map.Map<Principal, UserProfileOld>;
+    messages : Map.Map<Text, {
+      id : Text;
+      itemId : Text;
+      fromPrincipal : Principal;
+      toPrincipal : Principal;
+      content : Text;
+      createdAt : Int;
+    }>;
+    notifications : Map.Map<Text, {
+      id : Text;
+      userId : Principal;
+      itemId : Text;
+      message : Text;
+      isRead : Bool;
+      createdAt : Int;
+    }>;
+    userProfiles : Map.Map<Principal, {
+      principal : Principal;
+      displayName : Text;
+      email : Text;
+      isAdmin : Bool;
+      createdAt : Int;
+      rewardPoints : Nat;
+      thanksReceived : Nat;
+    }>;
+    securityPatrolUsers : Set.Set<Principal>;
+  };
+
+  // New item with idCardPhotoId support
+  type NewItem = {
+    id : Text;
+    itemType : ItemType.Type;
+    title : Text;
+    description : Text;
+    category : Category.Type;
+    location : Text;
+    date : Int;
+    contactInfo : Text;
+    photoId : ?Text;
+    status : ItemStatus.Type;
+    reportedBy : Principal;
+    createdAt : Int;
+    qrClaimCode : ?Text;
+    claimedByQR : Bool;
+    isSecurityPatrol : Bool;
+    archivedAt : ?Int;
+    idCardPhotoId : ?Text;
   };
 
   type NewActor = {
     items : Map.Map<Text, NewItem>;
-    userProfiles : Map.Map<Principal, UserProfileNew>;
+    messages : Map.Map<Text, {
+      id : Text;
+      itemId : Text;
+      fromPrincipal : Principal;
+      toPrincipal : Principal;
+      content : Text;
+      createdAt : Int;
+    }>;
+    notifications : Map.Map<Text, {
+      id : Text;
+      userId : Principal;
+      itemId : Text;
+      message : Text;
+      isRead : Bool;
+      createdAt : Int;
+    }>;
+    userProfiles : Map.Map<Principal, {
+      principal : Principal;
+      displayName : Text;
+      email : Text;
+      isAdmin : Bool;
+      createdAt : Int;
+      rewardPoints : Nat;
+      thanksReceived : Nat;
+    }>;
     securityPatrolUsers : Set.Set<Principal>;
   };
 
-  type UserProfileOld = {
-    principal : Principal;
-    displayName : Text;
-    email : Text;
-    isAdmin : Bool;
-    createdAt : Int;
-  };
-
-  type UserProfileNew = {
-    principal : Principal;
-    displayName : Text;
-    email : Text;
-    isAdmin : Bool;
-    createdAt : Int;
-    rewardPoints : Nat;
-    thanksReceived : Nat;
-  };
-
-  func convertCategory(category : OldCategory) : NewCategory {
-    switch (category) {
-      case (#wallet) { #wallet };
-      case (#phone) { #phone };
-      case (#idCard) { #idCard };
-      case (#books) { #books };
-      case (#keys) { #keys };
-      case (#laptop) { #laptop };
-      case (#bag) { #bag };
-      case (#clothing) { #clothing };
-      case (#jewelry) { #jewelry };
-      case (#other) { #other };
-    };
-  };
-
-  func convertStatus(status : OldItemStatus) : NewItemStatus {
-    switch (status) {
-      case (#pending) { #pending };
-      case (#active) { #active };
-      case (#resolved) { #resolved };
-      case (#rejected) { #rejected };
-    };
-  };
-
-  func convertItem(oldItem : OldItem) : NewItem {
-    {
-      oldItem with
-      category = convertCategory(oldItem.category);
-      status = convertStatus(oldItem.status);
-      qrClaimCode = null;
-      claimedByQR = false;
-      isSecurityPatrol = false;
-      archivedAt = null;
-    };
-  };
-
-  func convertUserProfile(oldProfile : UserProfileOld) : UserProfileNew {
-    {
-      oldProfile with
-      rewardPoints = 0;
-      thanksReceived = 0;
-    };
-  };
-
+  // Migration function called by main actor with-clause
   public func run(old : OldActor) : NewActor {
     let newItems = old.items.map<Text, OldItem, NewItem>(
-      func(_id, oldItem) { convertItem(oldItem) }
+      func(_id, oldItem) {
+        { oldItem with idCardPhotoId = null };
+      }
     );
-
-    let newProfiles = old.userProfiles.map<Principal, UserProfileOld, UserProfileNew>(
-      func(_p, oldProfile) { convertUserProfile(oldProfile) }
-    );
-
-    {
-      items = newItems;
-      userProfiles = newProfiles;
-      securityPatrolUsers = Set.empty<Principal>();
-    };
+    { old with items = newItems };
   };
 };

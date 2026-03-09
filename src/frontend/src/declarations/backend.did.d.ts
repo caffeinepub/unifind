@@ -33,6 +33,7 @@ export interface Item {
   'itemType' : Type__2,
   'category' : Type__1,
   'location' : string,
+  'idCardPhotoId' : [] | [string],
   'photoId' : [] | [string],
   'archivedAt' : [] | [bigint],
 }
@@ -60,6 +61,7 @@ export interface ReportItemInput {
   'itemType' : Type__2,
   'category' : Type__1,
   'location' : string,
+  'idCardPhotoId' : [] | [string],
   'photoId' : [] | [string],
 }
 export type Type = { 'resolved' : null } |
@@ -132,6 +134,7 @@ export interface _SERVICE {
   'getArchivedItems' : ActorMethod<[], Array<Item>>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getIdCardPhotoId' : ActorMethod<[string], [] | [string]>,
   'getItemById' : ActorMethod<[string], [] | [Item]>,
   'getItems' : ActorMethod<[FilterItemsInput], Array<Item>>,
   'getItemsByReporter' : ActorMethod<[Principal], Array<Item>>,
