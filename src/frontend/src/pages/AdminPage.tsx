@@ -76,6 +76,7 @@ import {
   useRegenerateQRCode,
   useUpdateItemStatus,
 } from "../hooks/useQueries";
+import { useStorageUrl } from "../hooks/useStorageUrl";
 import { categoryLabels, formatDate } from "../utils/format";
 
 function StatusBadge({ status }: { status: string }) {
@@ -469,6 +470,158 @@ function QRCodesTab({ items }: { items: Item[] }) {
   );
 }
 
+function PendingItemCard({ item, index }: { item: Item; index: number }) {
+  const updateStatus = useUpdateItemStatus();
+  const [idModalOpen, setIdModalOpen] = useState(false);
+  const { url: photoUrl } = useStorageUrl(item.photoId ?? null);
+
+  const handleApprove = async () => {
+    try {
+      await updateStatus.mutateAsync({ itemId: item.id, status: Type.active });
+      toast.success("Item approved and published.");
+    } catch {
+      toast.error("Failed to approve item.");
+    }
+  };
+
+  const handleReject = async () => {
+    try {
+      await updateStatus.mutateAsync({
+        itemId: item.id,
+        status: Type.rejected,
+      });
+      toast.success("Item rejected.");
+    } catch {
+      toast.error("Failed to reject item.");
+    }
+  };
+
+  return (
+    <div
+      className="bg-white rounded-xl border border-border shadow-card overflow-hidden"
+      data-ocid={`admin.pending.item.${index}`}
+    >
+      <div className="p-5 space-y-4">
+        {/* Header row */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <h3 className="font-semibold text-foreground text-base truncate">
+                {item.title}
+              </h3>
+              <span
+                className={cn(
+                  "px-2 py-0.5 text-xs font-semibold rounded-full border capitalize shrink-0",
+                  item.itemType === "lost" ? "type-lost" : "type-found",
+                )}
+              >
+                {item.itemType}
+              </span>
+              {item.idCardPhotoId && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                  <ShieldCheck className="w-3 h-3" />
+                  ID uploaded
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+              <span>{categoryLabels[item.category] ?? item.category}</span>
+              <span>•</span>
+              <span>{item.location}</span>
+              <span>•</span>
+              <span>{formatDate(item.date)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Description */}
+        <p className="text-sm text-foreground/80 leading-relaxed">
+          {item.description}
+        </p>
+
+        {/* Item photo */}
+        {photoUrl && (
+          <div className="rounded-lg overflow-hidden border border-border">
+            <img
+              src={photoUrl}
+              alt={item.title}
+              className="w-full max-h-48 object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).parentElement!.style.display =
+                  "none";
+              }}
+            />
+          </div>
+        )}
+
+        {/* Contact info */}
+        {item.contactInfo && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Contact:</span>
+            <span>{item.contactInfo}</span>
+          </div>
+        )}
+
+        {/* Reporter */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Reporter:</span>
+          <span className="font-mono">
+            {item.reportedBy.toString().slice(0, 24)}…
+          </span>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pt-1 border-t border-border">
+          <Button
+            size="sm"
+            onClick={handleApprove}
+            disabled={updateStatus.isPending}
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+            data-ocid={`admin.pending.approve_button.${index}`}
+          >
+            {updateStatus.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <CheckCircle className="w-3.5 h-3.5" />
+            )}
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleReject}
+            disabled={updateStatus.isPending}
+            className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50"
+            data-ocid={`admin.pending.reject_button.${index}`}
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            Reject
+          </Button>
+          {item.idCardPhotoId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIdModalOpen(true)}
+              className="gap-1.5 ml-auto border-amber-200 text-amber-700 hover:bg-amber-50"
+              data-ocid={`admin.pending.view_id_button.${index}`}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              View ID Card
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* ID Card Modal */}
+      <IdCardModal
+        item={item}
+        open={idModalOpen}
+        onClose={() => setIdModalOpen(false)}
+      />
+    </div>
+  );
+}
+
 function IdCardModal({
   item,
   open,
@@ -478,32 +631,13 @@ function IdCardModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const { data: idCardPhotoId, isLoading } = useGetIdCardPhotoId(
+  const { data: idCardPhotoId, isLoading: loadingId } = useGetIdCardPhotoId(
     open ? item.id : null,
   );
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const prevBlobUrl = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (prevBlobUrl.current) {
-      URL.revokeObjectURL(prevBlobUrl.current);
-      prevBlobUrl.current = null;
-    }
-    setBlobUrl(null);
-
-    if (!idCardPhotoId) return;
-    // Use the same pattern as item photo display
-    const photoUrl = `/api/photo/${idCardPhotoId}`;
-    setBlobUrl(photoUrl);
-  }, [idCardPhotoId]);
-
-  useEffect(() => {
-    return () => {
-      if (prevBlobUrl.current) {
-        URL.revokeObjectURL(prevBlobUrl.current);
-      }
-    };
-  }, []);
+  const { url: blobUrl, loading: loadingUrl } = useStorageUrl(
+    open ? idCardPhotoId : null,
+  );
+  const isLoading = loadingId || loadingUrl;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -1028,29 +1162,10 @@ export default function AdminPage() {
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl border border-border overflow-hidden shadow-card">
-              <Table data-ocid="admin.pending_table">
-                <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead>Item</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingItems.map((item, index) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      index={index + 1}
-                      showActions
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-4" data-ocid="admin.pending_list">
+              {pendingItems.map((item, index) => (
+                <PendingItemCard key={item.id} item={item} index={index + 1} />
+              ))}
             </div>
           )}
         </TabsContent>

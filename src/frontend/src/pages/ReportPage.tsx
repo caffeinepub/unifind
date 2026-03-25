@@ -32,6 +32,7 @@ import {
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Type__1, Type__2 } from "../backend.d";
+import { uploadFileToStorage } from "../config";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useReportItem } from "../hooks/useQueries";
 import { categoryLabels } from "../utils/format";
@@ -117,14 +118,12 @@ export default function ReportPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [contactInfo, setContactInfo] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [photoId, setPhotoId] = useState<string | undefined>();
 
   // CU ID Card state
   const idCardFileInputRef = useRef<HTMLInputElement>(null);
   const [idCardPreviewUrl, setIdCardPreviewUrl] = useState<string | null>(null);
-  const [idCardUploadProgress, setIdCardUploadProgress] = useState(0);
   const [isIdCardUploading, setIsIdCardUploading] = useState(false);
   const [idCardPhotoId, setIdCardPhotoId] = useState<string | undefined>();
 
@@ -142,32 +141,25 @@ export default function ReportPage() {
 
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
-
+    setPhotoId(undefined);
     setIsUploading(true);
-    setUploadProgress(0);
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 100);
 
-    setTimeout(() => {
-      clearInterval(interval);
-      setUploadProgress(100);
+    try {
+      const hash = await uploadFileToStorage(file);
+      setPhotoId(hash);
+    } catch (err) {
+      console.error("Photo upload failed:", err);
+      toast.error("Photo upload failed. Please try again.");
+      setPreviewUrl(null);
+    } finally {
       setIsUploading(false);
-      setPhotoId(`photo-${Date.now()}`);
-    }, 1200);
+    }
   };
 
   const removePhoto = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setPhotoId(undefined);
-    setUploadProgress(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -184,32 +176,25 @@ export default function ReportPage() {
 
     const url = URL.createObjectURL(file);
     setIdCardPreviewUrl(url);
-
+    setIdCardPhotoId(undefined);
     setIsIdCardUploading(true);
-    setIdCardUploadProgress(0);
-    const interval = setInterval(() => {
-      setIdCardUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 100);
 
-    setTimeout(() => {
-      clearInterval(interval);
-      setIdCardUploadProgress(100);
+    try {
+      const hash = await uploadFileToStorage(file);
+      setIdCardPhotoId(hash);
+    } catch (err) {
+      console.error("ID card upload failed:", err);
+      toast.error("ID card upload failed. Please try again.");
+      setIdCardPreviewUrl(null);
+    } finally {
       setIsIdCardUploading(false);
-      setIdCardPhotoId(`id-card-${Date.now()}`);
-    }, 1200);
+    }
   };
 
   const removeIdCard = () => {
     if (idCardPreviewUrl) URL.revokeObjectURL(idCardPreviewUrl);
     setIdCardPreviewUrl(null);
     setIdCardPhotoId(undefined);
-    setIdCardUploadProgress(0);
     if (idCardFileInputRef.current) idCardFileInputRef.current.value = "";
   };
 
@@ -218,6 +203,16 @@ export default function ReportPage() {
 
     if (!isLoggedIn) {
       login();
+      return;
+    }
+
+    if (!title || title.trim().length < 5) {
+      toast.error("Title must be at least 5 characters.");
+      return;
+    }
+
+    if (!description || description.trim().length < 20) {
+      toast.error("Description must be at least 20 characters.");
       return;
     }
 
@@ -254,8 +249,9 @@ export default function ReportPage() {
         idCardPhotoId: idCardPhotoId,
       });
 
-      toast.success("Item reported successfully!", {
-        description: "Your report has been submitted and is pending review.",
+      toast.success("Submitted for review!", {
+        description:
+          "An admin will review and approve your report shortly. It will appear publicly once approved.",
       });
 
       navigate({ to: "/my-items" });
@@ -280,11 +276,11 @@ export default function ReportPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
             <div className="flex-1">
-              <p className="text-sm text-amber-800 font-medium">
+              <p className="text-sm font-medium text-amber-800">
                 Sign in required
               </p>
               <p className="text-xs text-amber-700">
-                Please sign in with your university account to submit a report.
+                You need to sign in with your CU account to submit a report.
               </p>
             </div>
             <Button
@@ -292,6 +288,7 @@ export default function ReportPage() {
               onClick={login}
               disabled={isLoggingIn}
               className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+              data-ocid="report.login_button"
             >
               {isLoggingIn ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -304,63 +301,77 @@ export default function ReportPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Item Type Toggle */}
+        {/* Item Type */}
         <Card className="border-border shadow-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Item Type</CardTitle>
+            <CardTitle className="text-base">What are you reporting?</CardTitle>
           </CardHeader>
           <CardContent>
             <ToggleGroup
               type="single"
               value={itemType}
               onValueChange={(v) => v && setItemType(v as Type__2)}
-              className="grid grid-cols-2 gap-3"
+              className="gap-4"
               data-ocid="report.item_type_toggle"
             >
               <ToggleGroupItem
                 value={Type__2.lost}
                 className={cn(
-                  "flex items-center gap-2 py-3 rounded-xl border data-[state=on]:border-red-300 data-[state=on]:bg-red-50 data-[state=on]:text-red-700",
+                  "flex-1 py-3 gap-2 rounded-xl border-2 data-[state=on]:border-red-400 data-[state=on]:bg-red-50 data-[state=on]:text-red-700",
                 )}
+                data-ocid="report.lost_toggle"
               >
-                <AlertTriangle className="w-4 h-4" />I Lost Something
+                <AlertTriangle className="w-4 h-4" />I Lost an Item
               </ToggleGroupItem>
               <ToggleGroupItem
                 value={Type__2.found}
                 className={cn(
-                  "flex items-center gap-2 py-3 rounded-xl border data-[state=on]:border-teal-300 data-[state=on]:bg-teal-50 data-[state=on]:text-teal-700",
+                  "flex-1 py-3 gap-2 rounded-xl border-2 data-[state=on]:border-teal-400 data-[state=on]:bg-teal-50 data-[state=on]:text-teal-700",
                 )}
+                data-ocid="report.found_toggle"
               >
-                <Package className="w-4 h-4" />I Found Something
+                <CheckCircle className="w-4 h-4" />I Found an Item
               </ToggleGroupItem>
             </ToggleGroup>
           </CardContent>
         </Card>
 
-        {/* Basic Info */}
+        {/* Item Details */}
         <Card className="border-border shadow-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Item Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="title">Item Title *</Label>
+              <Label htmlFor="title">
+                Item Title <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="title"
-                placeholder="e.g. Black iPhone 14, Blue North Face Backpack…"
+                placeholder="e.g., Blue Samsung phone, CU ID Card"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
+                minLength={5}
                 data-ocid="report.title_input"
               />
+              {title.length > 0 && title.length < 5 && (
+                <p
+                  className="text-xs text-destructive"
+                  data-ocid="report.title_error"
+                >
+                  Title must be at least 5 characters
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">
-              <Label>Category *</Label>
+              <Label>
+                Category <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={category}
                 onValueChange={(v) => setCategory(v as Type__1)}
-                required
               >
                 <SelectTrigger data-ocid="report.category_select">
                   <SelectValue placeholder="Select a category" />
@@ -368,12 +379,10 @@ export default function ReportPage() {
                 <SelectContent>
                   {CATEGORY_GROUPS.map((group) => (
                     <SelectGroup key={group.label}>
-                      <SelectLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                        {group.label}
-                      </SelectLabel>
+                      <SelectLabel>{group.label}</SelectLabel>
                       {group.categories.map((cat) => (
                         <SelectItem key={cat} value={cat}>
-                          {categoryLabels[cat]}
+                          {categoryLabels[cat] ?? cat}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -383,47 +392,71 @@ export default function ReportPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="description">Description *</Label>
+              <Label htmlFor="description">
+                Description <span className="text-destructive">*</span>
+              </Label>
               <Textarea
                 id="description"
-                placeholder="Describe the item in detail — color, brand, any distinctive features, condition…"
+                placeholder="Describe the item in detail — color, brand, condition, any unique features…"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                required
                 rows={4}
                 className="resize-none"
+                required
+                minLength={20}
                 data-ocid="report.description_textarea"
               />
+              <div className="flex justify-between">
+                {description.length > 0 && description.length < 20 && (
+                  <p
+                    className="text-xs text-destructive"
+                    data-ocid="report.description_error"
+                  >
+                    Description must be at least 20 characters
+                  </p>
+                )}
+                <p
+                  className={cn(
+                    "text-xs ml-auto",
+                    description.length < 20
+                      ? "text-muted-foreground"
+                      : "text-emerald-600",
+                  )}
+                >
+                  {description.length}/20 min
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Campus Zone Picker */}
+        {/* Location */}
         <Card className="border-border shadow-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
-              Campus Location *
+              Campus Location
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Select the zone where the item was{" "}
-              {itemType === Type__2.lost ? "lost" : "found"}
-            </p>
-            <div className="flex flex-wrap gap-2">
+            <Label>
+              Select Zone <span className="text-destructive">*</span>
+            </Label>
+            <div
+              className="flex flex-wrap gap-2"
+              data-ocid="report.location_select"
+            >
               {CAMPUS_ZONES.map((zone) => (
                 <button
                   key={zone}
                   type="button"
                   onClick={() => setSelectedZone(zone)}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium border transition-all",
+                    "px-3 py-1.5 text-sm rounded-lg border transition-colors",
                     selectedZone === zone
-                      ? "bg-primary text-white border-primary shadow-sm"
-                      : "bg-white text-muted-foreground border-border hover:border-primary hover:text-primary",
+                      ? "bg-primary text-white border-primary"
+                      : "bg-white border-border hover:border-primary hover:text-primary",
                   )}
-                  data-ocid="report.location_zone_button"
                 >
                   {zone}
                 </button>
@@ -432,78 +465,51 @@ export default function ReportPage() {
                 type="button"
                 onClick={() => setSelectedZone("Other")}
                 className={cn(
-                  "px-3 py-1.5 rounded-full text-sm font-medium border transition-all",
+                  "px-3 py-1.5 text-sm rounded-lg border transition-colors",
                   selectedZone === "Other"
-                    ? "bg-primary text-white border-primary shadow-sm"
-                    : "bg-white text-muted-foreground border-border hover:border-primary hover:text-primary",
+                    ? "bg-primary text-white border-primary"
+                    : "bg-white border-border hover:border-primary hover:text-primary",
                 )}
-                data-ocid="report.location_other_button"
               >
-                Other…
+                Other
               </button>
             </div>
             {selectedZone === "Other" && (
               <Input
-                placeholder="Enter specific location…"
+                placeholder="Enter specific location"
                 value={customLocation}
                 onChange={(e) => setCustomLocation(e.target.value)}
-                data-ocid="report.location_input"
-                className="mt-2"
+                data-ocid="report.custom_location_input"
               />
-            )}
-            {selectedZone && selectedZone !== "Other" && (
-              <div className="flex items-center gap-2 text-sm text-primary">
-                <MapPin className="w-3.5 h-3.5" />
-                <span>
-                  Selected: <strong>{selectedZone}</strong>
-                </span>
-              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Date */}
+        {/* Date & Contact */}
         <Card className="border-border shadow-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Date</CardTitle>
+            <CardTitle className="text-base">Date & Contact</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="date">
-                Date {itemType === Type__2.lost ? "lost" : "found"} *
-              </Label>
+              <Label htmlFor="date">Date</Label>
               <Input
                 id="date"
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                required
-                max={new Date().toISOString().split("T")[0]}
                 data-ocid="report.date_input"
               />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Contact Info */}
-        <Card className="border-border shadow-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Contact Information</CardTitle>
-          </CardHeader>
-          <CardContent>
             <div className="space-y-1.5">
-              <Label htmlFor="contact">Email or Phone *</Label>
+              <Label htmlFor="contact">Contact Info (optional)</Label>
               <Input
                 id="contact"
-                placeholder="your.name@cumail.in or +91-XXXXXXXXXX"
+                placeholder="Phone number or email"
                 value={contactInfo}
                 onChange={(e) => setContactInfo(e.target.value)}
-                required
                 data-ocid="report.contact_input"
               />
-              <p className="text-xs text-muted-foreground">
-                This will be shown to other users so they can contact you.
-              </p>
             </div>
           </CardContent>
         </Card>
@@ -511,7 +517,10 @@ export default function ReportPage() {
         {/* Photo Upload */}
         <Card className="border-border shadow-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Photo (Optional)</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Camera className="w-4 h-4 text-primary" />
+              Item Photo (optional)
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {previewUrl ? (
@@ -525,7 +534,7 @@ export default function ReportPage() {
                   <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
                     <div className="text-white text-center">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                      <span className="text-sm">{uploadProgress}%</span>
+                      <span className="text-sm">Uploading…</span>
                     </div>
                   </div>
                 )}
@@ -601,7 +610,10 @@ export default function ReportPage() {
 
             {idCardPhotoId && !isIdCardUploading ? (
               /* Success state */
-              <div className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+              <div
+                className="flex items-center gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-200"
+                data-ocid="report.id_card_success_state"
+              >
                 <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-emerald-800">
@@ -628,12 +640,13 @@ export default function ReportPage() {
                   className="w-full h-48 object-cover rounded-lg border border-amber-200"
                 />
                 {isIdCardUploading && (
-                  <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                  <div
+                    className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center"
+                    data-ocid="report.id_card_loading_state"
+                  >
                     <div className="text-white text-center">
                       <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                      <span className="text-sm">
-                        Uploading securely… {idCardUploadProgress}%
-                      </span>
+                      <span className="text-sm">Uploading securely…</span>
                     </div>
                   </div>
                 )}
@@ -713,6 +726,11 @@ export default function ReportPage() {
             </>
           )}
         </Button>
+
+        <p className="text-center text-xs text-muted-foreground pb-4">
+          Your report will be reviewed by a CU administrator before being
+          published.
+        </p>
       </form>
     </div>
   );

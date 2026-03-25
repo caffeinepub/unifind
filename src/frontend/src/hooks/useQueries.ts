@@ -89,6 +89,8 @@ export function useReportItem() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["my-items"] });
+      qc.invalidateQueries({ queryKey: ["public-stats"] });
+      qc.invalidateQueries({ queryKey: ["pending-items"] });
     },
   });
 }
@@ -108,6 +110,8 @@ export function useUpdateItemStatus() {
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["pending-items"] });
       qc.invalidateQueries({ queryKey: ["my-items"] });
+      qc.invalidateQueries({ queryKey: ["public-stats"] });
+      qc.invalidateQueries({ queryKey: ["all-items"] });
     },
   });
 }
@@ -123,6 +127,7 @@ export function useDeleteItem() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["my-items"] });
+      qc.invalidateQueries({ queryKey: ["public-stats"] });
     },
   });
 }
@@ -433,23 +438,41 @@ export function useGetIdCardPhotoId(itemId: string | null) {
 
 // ── Stats helpers ──────────────────────────────────────────────────────────
 
-export function useStats() {
+export function useGetPublicStats() {
   const { actor, isFetching } = useActor();
   return useQuery({
-    queryKey: ["stats"],
+    queryKey: ["public-stats"],
     queryFn: async () => {
-      if (!actor) return { lost: 0, found: 0, resolved: 0 };
-      const [lost, found, resolved] = await Promise.all([
+      if (!actor)
+        return { lost: BigInt(0), found: BigInt(0), resolved: BigInt(0) };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fn = (actor as any).getPublicStats;
+      if (fn) return fn.call(actor);
+      const [lost, found] = await Promise.all([
         actor.getItems({ itemType: "lost" as never }),
         actor.getItems({ itemType: "found" as never }),
-        actor.getItems({ status: "resolved" as never }),
       ]);
       return {
-        lost: lost.length,
-        found: found.length,
-        resolved: resolved.length,
+        lost: BigInt(lost.length),
+        found: BigInt(found.length),
+        resolved: BigInt(0),
       };
     },
     enabled: !!actor && !isFetching,
   });
+}
+
+export function useStats() {
+  const { data, isLoading, isError } = useGetPublicStats();
+  return {
+    data: data
+      ? {
+          lost: Number(data.lost),
+          found: Number(data.found),
+          resolved: Number(data.resolved),
+        }
+      : { lost: 0, found: 0, resolved: 0 },
+    isLoading,
+    isError,
+  };
 }

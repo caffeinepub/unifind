@@ -2,7 +2,6 @@ import Nat "mo:core/Nat";
 import Text "mo:core/Text";
 import Set "mo:core/Set";
 import Int "mo:core/Int";
-import List "mo:core/List";
 import Map "mo:core/Map";
 import Array "mo:core/Array";
 import Time "mo:core/Time";
@@ -13,7 +12,6 @@ import Runtime "mo:core/Runtime";
 import AccessControl "authorization/access-control";
 
 import MixinStorage "blob-storage/Mixin";
-import Storage "blob-storage/Storage";
 import MixinAuthorization "authorization/MixinAuthorization";
 
 // Add migration
@@ -179,7 +177,7 @@ actor {
     prefix # "-" # Time.now().toText();
   };
 
-  module Compare {
+  module _Compare {
     public func compareByCreatedAt(a : Item, b : Item) : Order.Order {
       Int.compare(b.createdAt, a.createdAt);
     };
@@ -263,6 +261,16 @@ actor {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can report items");
     };
+    // Basic spam/validation checks
+    if (input.title.size() < 5) {
+      Runtime.trap("Title must be at least 5 characters");
+    };
+    if (input.description.size() < 20) {
+      Runtime.trap("Description must be at least 20 characters");
+    };
+    if (input.idCardPhotoId == null) {
+      Runtime.trap("CU ID card photo is required for verification");
+    };
 
     let itemId = generateId("item");
 
@@ -306,7 +314,7 @@ actor {
     });
   };
 
-  public query ({ caller }) func getItems(filters : FilterItemsInput) : async [Item] {
+  public query func getItems(filters : FilterItemsInput) : async [Item] {
     items.values().toArray().filter(
       func(item) {
         let itemTypeMatch = switch (filters.itemType) {
@@ -333,14 +341,34 @@ actor {
           case (null) { true };
           case (?s) { s == item.status };
         };
-        let isActive = item.status == #pending or item.status == #active;
+        // Only show approved (active) items publicly; pending/rejected items are hidden
+        let isApproved = item.status == #active;
 
-        itemTypeMatch and categoryMatch and locationMatch and dateFromMatch and dateToMatch and statusMatch and isActive;
+        itemTypeMatch and categoryMatch and locationMatch and dateFromMatch and dateToMatch and statusMatch and isApproved;
       }
     );
   };
 
-  public query ({ caller }) func getItemById(itemId : Text) : async ?Item {
+  public query func getPublicStats() : async { lost : Nat; found : Nat; resolved : Nat } {
+    var lost = 0;
+    var found = 0;
+    var resolved = 0;
+    items.values().forEach(func(item) {
+      switch (item.status) {
+        case (#active) {
+          switch (item.itemType) {
+            case (#lost) { lost += 1 };
+            case (#found) { found += 1 };
+          };
+        };
+        case (#resolved) { resolved += 1 };
+        case (_) {};
+      };
+    });
+    { lost; found; resolved };
+  };
+
+  public query func getItemById(itemId : Text) : async ?Item {
     items.get(itemId);
   };
 
@@ -508,7 +536,7 @@ actor {
     items.values().toArray().filter(func(item) { item.reportedBy == caller });
   };
 
-  public query ({ caller }) func searchItems(searchTerm : Text, filters : FilterItemsInput) : async [Item] {
+  public query func searchItems(searchTerm : Text, filters : FilterItemsInput) : async [Item] {
     let filteredItems = items.values().toArray().filter(
       func(item) {
         let textMatch = item.title.contains(#text searchTerm) or item.description.contains(#text searchTerm);

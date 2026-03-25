@@ -117,6 +117,7 @@ export interface backendInterface {
     getIdCardPhotoId(itemId: string): Promise<string | null>;
     getItemById(itemId: string): Promise<Item | null>;
     getItems(filters: FilterItemsInput): Promise<Array<Item>>;
+    getPublicStats(): Promise<{ lost: bigint; found: bigint; resolved: bigint }>;
     getItemsByReporter(reporter: Principal): Promise<Array<Item>>;
     getMessages(itemId: string): Promise<Array<Message>>;
     getMyItems(): Promise<Array<Item>>;
