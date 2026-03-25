@@ -258,6 +258,36 @@ export function useGenerateQRCode() {
   });
 }
 
+export function useRegenerateQRCode() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.regenerateQRClaimCode(itemId);
+    },
+    onSuccess: (_data, itemId) => {
+      qc.invalidateQueries({ queryKey: ["item", itemId] });
+      qc.invalidateQueries({ queryKey: ["my-items"] });
+      qc.invalidateQueries({ queryKey: ["items"] });
+      qc.invalidateQueries({ queryKey: ["all-items"] });
+    },
+  });
+}
+
+export function useGetQRExpiry(itemId: string | null) {
+  const { actor } = useActor();
+  return useQuery({
+    queryKey: ["qr-expiry", itemId],
+    queryFn: async () => {
+      if (!actor || !itemId) return null;
+      return actor.getQRExpiry(itemId);
+    },
+    enabled: !!actor && !!itemId,
+    staleTime: 30_000,
+  });
+}
+
 export function useClaimByQR() {
   const { actor } = useActor();
   const qc = useQueryClient();

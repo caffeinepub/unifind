@@ -208,6 +208,8 @@ export interface backendInterface {
     claimByQR(itemId: string, code: string): Promise<void>;
     deleteItem(itemId: string): Promise<void>;
     generateQRClaimCode(itemId: string): Promise<string>;
+    regenerateQRClaimCode(itemId: string): Promise<string>;
+    getQRExpiry(itemId: string): Promise<bigint | null>;
     getAllItems(): Promise<Array<Item>>;
     getArchivedItems(): Promise<Array<Item>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
@@ -428,6 +430,34 @@ export class Backend implements backendInterface {
         } else {
             const result = await this.actor.generateQRClaimCode(arg0);
             return result;
+        }
+    }
+    async regenerateQRClaimCode(arg0: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.regenerateQRClaimCode(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.regenerateQRClaimCode(arg0);
+            return result;
+        }
+    }
+    async getQRExpiry(arg0: string): Promise<bigint | null> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getQRExpiry(arg0);
+                return result.length > 0 ? result[0] : null;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getQRExpiry(arg0);
+            return result.length > 0 ? result[0] : null;
         }
     }
     async getAllItems(): Promise<Array<Item>> {

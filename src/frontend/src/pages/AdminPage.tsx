@@ -71,7 +71,9 @@ import {
   useGetArchivedItems,
   useGetIdCardPhotoId,
   useGetPendingItems,
+  useGetQRExpiry,
   useIsCallerAdmin,
+  useRegenerateQRCode,
   useUpdateItemStatus,
 } from "../hooks/useQueries";
 import { categoryLabels, formatDate } from "../utils/format";
@@ -273,11 +275,132 @@ function QRCodeDisplay({ value }: { value: string }) {
   );
 }
 
+function QRItemCard({
+  item,
+  onGenerate,
+  onRegenerate,
+  generatedCode,
+  generatedExpiry,
+  isPending,
+}: {
+  item: Item;
+  onGenerate: (id: string) => void;
+  onRegenerate: (id: string) => void;
+  generatedCode?: string;
+  generatedExpiry?: number;
+  isPending: boolean;
+}) {
+  const qrCode = item.qrClaimCode ?? generatedCode;
+  const { data: backendExpiryNs } = useGetQRExpiry(qrCode ? item.id : null);
+
+  const expiresAtMs = generatedExpiry
+    ? generatedExpiry
+    : backendExpiryNs != null
+      ? Number(backendExpiryNs) / 1_000_000
+      : null;
+  const isExpired = expiresAtMs !== null && Date.now() > expiresAtMs;
+
+  return (
+    <Card className="border-border">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Link
+                to="/item/$id"
+                params={{ id: item.id }}
+                className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1"
+              >
+                {item.title}
+              </Link>
+              <StatusBadge status={item.status} />
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              {categoryLabels[item.category] ?? item.category} • {item.location}
+            </p>
+
+            {qrCode ? (
+              <div className="space-y-2">
+                <QRCodeDisplay value={qrCode} />
+                {!item.claimedByQR && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {expiresAtMs !== null && (
+                      <span
+                        className={`text-xs ${isExpired ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                      >
+                        {isExpired
+                          ? "Expired — owner cannot use this code"
+                          : `Expires: ${new Date(expiresAtMs).toLocaleDateString()}`}
+                      </span>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onRegenerate(item.id)}
+                      disabled={isPending}
+                      className="gap-1 text-xs h-7"
+                      data-ocid="admin.regenerate_qr_button"
+                    >
+                      {isPending ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <QrCode className="w-3 h-3" />
+                      )}
+                      Regenerate
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-40 h-40 bg-muted rounded-lg border border-dashed border-border flex items-center justify-center">
+                  <QrCode className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    No QR code yet. Generate one so the owner can claim this
+                    item.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => onGenerate(item.id)}
+                    disabled={isPending}
+                    className="bg-primary hover:bg-primary/90 text-white gap-2"
+                    data-ocid="admin.generate_qr_button"
+                  >
+                    {isPending ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <QrCode className="w-3 h-3" />
+                    )}
+                    Generate QR Code
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {item.claimedByQR && (
+              <div className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
+                <CheckCircle className="w-3 h-3" />
+                Claimed via QR
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function QRCodesTab({ items }: { items: Item[] }) {
   const generateQR = useGenerateQRCode();
+  const regenerateQR = useRegenerateQRCode();
   const [generatedCodes, setGeneratedCodes] = useState<Record<string, string>>(
     {},
   );
+  const [generatedExpiry, setGeneratedExpiry] = useState<
+    Record<string, number>
+  >({});
 
   const eligibleItems = items.filter(
     (i) =>
@@ -288,10 +411,29 @@ function QRCodesTab({ items }: { items: Item[] }) {
   const handleGenerate = async (itemId: string) => {
     try {
       const code = await generateQR.mutateAsync(itemId);
+      const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
       setGeneratedCodes((prev) => ({ ...prev, [itemId]: code }));
-      toast.success("QR code generated!");
+      setGeneratedExpiry((prev) => ({ ...prev, [itemId]: expiresAt }));
+      toast.success("QR code generated! Valid for 7 days.");
     } catch {
       toast.error("Failed to generate QR code");
+    }
+  };
+
+  const handleRegenerate = async (itemId: string) => {
+    try {
+      const code = await regenerateQR.mutateAsync(itemId);
+      const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      setGeneratedCodes((prev) => ({ ...prev, [itemId]: code }));
+      setGeneratedExpiry((prev) => ({ ...prev, [itemId]: expiresAt }));
+      toast.success("QR code regenerated! Valid for 7 days.");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("already claimed")) {
+        toast.error("Cannot regenerate: this item was already claimed.");
+      } else {
+        toast.error("Failed to regenerate QR code");
+      }
     }
   };
 
@@ -311,74 +453,18 @@ function QRCodesTab({ items }: { items: Item[] }) {
 
   return (
     <div className="grid gap-4">
-      {eligibleItems.map((item, index) => {
-        const qrCode = item.qrClaimCode ?? generatedCodes[item.id];
-        return (
-          <Card
-            key={item.id}
-            className="border-border"
-            data-ocid={`admin.qr.item.${index + 1}`}
-          >
-            <CardContent className="p-4">
-              <div className="flex items-start gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Link
-                      to="/item/$id"
-                      params={{ id: item.id }}
-                      className="font-medium text-foreground hover:text-primary transition-colors line-clamp-1"
-                    >
-                      {item.title}
-                    </Link>
-                    <StatusBadge status={item.status} />
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    {categoryLabels[item.category] ?? item.category} •{" "}
-                    {item.location}
-                  </p>
-
-                  {qrCode ? (
-                    <QRCodeDisplay value={qrCode} />
-                  ) : (
-                    <div className="flex items-center gap-3">
-                      <div className="w-40 h-40 bg-muted rounded-lg border border-dashed border-border flex items-center justify-center">
-                        <QrCode className="w-8 h-8 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          No QR code yet. Generate one so the owner can claim
-                          this item.
-                        </p>
-                        <Button
-                          size="sm"
-                          onClick={() => handleGenerate(item.id)}
-                          disabled={generateQR.isPending}
-                          className="bg-primary hover:bg-primary/90 text-white gap-2"
-                          data-ocid="admin.generate_qr_button"
-                        >
-                          {generateQR.isPending ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <QrCode className="w-3 h-3" />
-                          )}
-                          Generate QR Code
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {item.claimedByQR && (
-                    <div className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
-                      <CheckCircle className="w-3 h-3" />
-                      Claimed via QR
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+      {eligibleItems.map((item, index) => (
+        <QRItemCard
+          key={item.id}
+          item={item}
+          onGenerate={handleGenerate}
+          onRegenerate={handleRegenerate}
+          generatedCode={generatedCodes[item.id]}
+          generatedExpiry={generatedExpiry[item.id]}
+          isPending={generateQR.isPending || regenerateQR.isPending}
+          data-ocid={`admin.qr.item.${index + 1}`}
+        />
+      ))}
     </div>
   );
 }

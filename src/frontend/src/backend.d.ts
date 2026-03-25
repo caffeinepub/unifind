@@ -108,6 +108,8 @@ export interface backendInterface {
     claimByQR(itemId: string, code: string): Promise<void>;
     deleteItem(itemId: string): Promise<void>;
     generateQRClaimCode(itemId: string): Promise<string>;
+    regenerateQRClaimCode(itemId: string): Promise<string>;
+    getQRExpiry(itemId: string): Promise<bigint | null>;
     getAllItems(): Promise<Array<Item>>;
     getArchivedItems(): Promise<Array<Item>>;
     getCallerUserProfile(): Promise<UserProfile | null>;

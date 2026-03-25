@@ -11,13 +11,13 @@ import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 
 import AccessControl "authorization/access-control";
-import Migration "migration";
+
 import MixinStorage "blob-storage/Mixin";
 import Storage "blob-storage/Storage";
 import MixinAuthorization "authorization/MixinAuthorization";
 
 // Add migration
-(with migration = Migration.run)
+
 actor {
   // Mixin components for access control and blob storage
   let accessControlState = AccessControl.initState();
@@ -168,6 +168,7 @@ actor {
 
   // Persistent data stores
   let items = Map.empty<Text, Item>();
+  let qrExpiry = Map.empty<Text, Int>(); // itemId -> expiresAt (nanoseconds)
   let messages = Map.empty<Text, Message>();
   let notifications = Map.empty<Text, Notification>();
   let userProfiles = Map.empty<Principal, UserProfile>();
@@ -554,11 +555,43 @@ actor {
     };
 
     let claimCode = generateId("qr");
+    let sevenDaysNs : Int = 7 * 24 * 60 * 60 * 1_000_000_000;
+    let expiresAt : Int = Time.now() + sevenDaysNs;
     let updatedItem : Item = {
       item with qrClaimCode = ?claimCode;
     };
     items.add(itemId, updatedItem);
+    qrExpiry.add(itemId, expiresAt);
     claimCode;
+  };
+
+  public shared ({ caller }) func regenerateQRClaimCode(itemId : Text) : async Text {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can generate QR codes");
+    };
+
+    let item = switch (items.get(itemId)) {
+      case (null) { Runtime.trap("Item not found") };
+      case (?item) { item };
+    };
+
+    if (item.claimedByQR) {
+      Runtime.trap("Item already claimed; cannot regenerate code");
+    };
+
+    let claimCode = generateId("qr");
+    let sevenDaysNs : Int = 7 * 24 * 60 * 60 * 1_000_000_000;
+    let expiresAt : Int = Time.now() + sevenDaysNs;
+    let updatedItem : Item = {
+      item with qrClaimCode = ?claimCode;
+    };
+    items.add(itemId, updatedItem);
+    qrExpiry.add(itemId, expiresAt);
+    claimCode;
+  };
+
+  public query func getQRExpiry(itemId : Text) : async ?Int {
+    qrExpiry.get(itemId);
   };
 
   public shared ({ caller }) func claimByQR(itemId : Text, code : Text) : async () {
@@ -572,12 +605,21 @@ actor {
     };
 
     switch (item.qrClaimCode) {
-      case (null) { Runtime.trap("No QR code for item") };
+      case (null) { Runtime.trap("No QR code for this item") };
       case (?itemCode) {
         if (itemCode != code) {
           Runtime.trap("Invalid QR code");
         };
       };
+    };
+
+    switch (qrExpiry.get(itemId)) {
+      case (?expiresAt) {
+        if (Time.now() > expiresAt) {
+          Runtime.trap("QR code has expired. Please ask the admin to regenerate it.");
+        };
+      };
+      case (null) {};
     };
 
     if (item.claimedByQR) {

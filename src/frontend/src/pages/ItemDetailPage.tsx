@@ -107,8 +107,21 @@ function QRClaimSection({ itemId }: { itemId: string }) {
       toast.success("Item claimed successfully!", {
         description: "The item has been marked as claimed.",
       });
-    } catch {
-      toast.error("Invalid or expired claim code. Please try again.");
+    } catch (e: unknown) {
+      const raw = e instanceof Error ? e.message : String(e);
+      if (raw.includes("expired")) {
+        toast.error("This QR code has expired.", {
+          description: "Ask the admin to regenerate a new code for this item.",
+        });
+      } else if (raw.includes("already claimed")) {
+        toast.error("This item has already been claimed.");
+      } else if (raw.includes("Invalid QR code")) {
+        toast.error("Invalid code. Double-check what you entered.");
+      } else if (raw.includes("No QR code")) {
+        toast.error("No claim code exists for this item yet.");
+      } else {
+        toast.error("Claim failed. Please try again.");
+      }
     }
   };
 
